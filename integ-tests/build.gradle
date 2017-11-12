@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+    id "com.commercehub.cucumber-jvm"
+}
+
+repositories {
+    mavenCentral()
+}
+
+addCucumberSuite 'cucumber'
+
+cucumber {
+    tags = ["~@ignore"]
+}
+
+dependencies {
+    compile project(":data-service-client")
+
+    cucumberCompile(
+        'info.cukes:cucumber-java8:1.2.5',
+        'info.cukes:cucumber-spring:1.2.5',
+        // To use JUnit assertions in the step definitions:
+        'junit:junit:4.12',
+
+        'org.apache.commons:commons-lang3:3.6',
+        'org.projectlombok:lombok:1.16.18',
+
+        'org.springframework:spring-beans',
+        'org.springframework:spring-context',
+        'org.springframework:spring-test',
+        'software.amazon.awssdk:cloudformation:2.0.0-preview-4'
+    )
+}
+

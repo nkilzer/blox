@@ -1,51 +1,121 @@
-# Blox
+# ![Logo](blox-logo.png)
 
-### Description
-Blox is a collection of open source projects for container management and orchestration. Blox gives you more control over how your containerized applications run on Amazon ECS. It enables you to build schedulers and integrate third-party schedulers on top of ECS, while leveraging Amazon ECS to fully manage and scale your clusters.
+# Blox: Open Source schedulers for Amazon ECS
 
-The *blox* project provides a scheduling framework to help you easily build custom tooling, such as schedulers, on top of Amazon ECS. The framework makes it easy to consume events from Amazon ECS, store the cluster state locally, and query the local data store though APIs. The *blox* project currently consists of two components:  
+[![Build Status](https://travis-ci.org/blox/blox.svg?branch=master)](https://travis-ci.org/blox/blox)
 
-* *cluster-state-service*
-* *daemon-scheduler*
+Blox provides open source schedulers optimized for running applications on Amazon ECS. Developers now have greater control over how their applications are deployed across clusters of resources, run and scale in production, and can take advantage of powerful placement capabilities of Amazon ECS.
+Blox is being delivered as a managed service via the Amazon ECS Console, API and CLIs. Blox v1.0 provides daemon scheduling for Amazon ECS. We will continue to add additional schedulers as part of this project.
+Blox schedulers are built using AWS primitives, and the Blox designs and code are open source. If you are interested in learning more or collaborating on the designs, please read the [design](docs/daemon_design.md).
+If you are currently using Blox v0.3, please read the [FAQ](FAQ.md).
 
-The *cluster-state-service* consumes events from a stream of all changes to containers and instances across your Amazon ECS clusters, persists the events in a local data store, and provides APIs (e.g., search, filter, list, etc.) that enable you to query the state of your cluster so you can respond to changes in real-time. The *cluster-state-service* tracks your Amazon ECS cluster state locally, and manages any drift in state by periodically reconciling state with Amazon ECS.
+### Project structure
+For an overview of the components of Blox, run:
 
-The *daemon-scheduler* is a scheduler that allows you to run exactly one task per host across all nodes in a cluster. The scheduler monitors the cluster state and launches tasks as new nodes join the cluster, and it is ideal for running monitoring agents, log collectors, etc. The scheduler can be used as a reference for how to use the *cluster-state-service* to build custom scheduling logic, and we plan to add additional scheduling capabilities for different use cases.
+```
+./gradlew projects
+```
+
+### Testing
+To run the full unit test suite, run:
+
+```
+./gradlew check
+```
+
+This will run the same tests that we run in the Travis CI build.
+
+### Deploying
+First, take a look at what Blox will put in your personal stack by running the
+`showStackConfig` task:
+
+```
+$ ./gradlew showStackConfig
+
+> Task :showStackConfig
+Blox deployment stack configuration:
+
+  Default resource name         (blox.name): blox-<username>-alpha-us-west-2 (default)
+  API Gateway stage            (blox.stage): alpha (default)
+  Stack prefix                (blox.prefix): <username>-alpha (default)
+  AWS Region                  (blox.region): us-west-2 (default)
+  AWS Credential Profile     (blox.profile): blox-<username>-alpha-us-west-2 (default)
+  Cloudformation stack name (blox.cfnStack): blox-<username>-alpha-us-west-2 (default)
+  Deployment S3 bucket name (blox.s3Bucket): blox-<username>-alpha-us-west-2 (default)
+
+To customize these values, modify ~/.gradle/gradle.properties to override the property listed.
+
+AWS CLI configuration for profile blox-<username>-alpha-us-west-2:
+
+The config profile (blox-<username>-alpha-us-west-2) could not be found
+```
+
+If you wish to customize any of these values, you can do so by overriding the
+property in parentheses using [any of the supported ways to override Gradle
+properties](https://docs.gradle.org/current/userguide/build_environment.html#sec:gradle_properties_and_system_properties).
+The easiest way is to override it for your user in `~/.gradle/gradle.properties`:
+
+```
+blox.profile=default
+blox.region=us-east-1
+```
+
+Next, in order to deploy your personal stack:
+- install the [official AWS CLI](https://aws.amazon.com/cli/)
+- create an IAM user with the following permissions:
+
+    ```json
+    {
+        "Version":"2012-10-17",
+        "Statement":[{
+            "Effect":"Allow",
+            "Action":[
+                "s3:*",
+                "lambda:*",
+                "apigateway:*",
+                "cloudformation:*",
+                "iam:*"
+            ],
+            "Resource":"*"
+        }]
+    }
+
+    ```
+
+  These permissions are pretty broad, so we recommend you use a separate, test account.
+
+- configure the AWS Credential Profile shown in the `showStackOutput` task with
+  the AWS credentials for the user you created above:
+
+    ```
+    aws configure --profile blox-<username>-alpha-us-west-2
+    ```
+
+- create an S3 bucket where all resources (code, cloudformation templates, etc) to be deployed will be stored:
+
+    ```
+    ./gradlew createBucket
+    ```
+
+- deploy the Blox stack:
+
+    ```
+    ./gradlew deploy
+    ```
+
+### End to end testing
+Once you have a stack deployed, you can test it with:
+
+```
+./gradlew testEndToEnd
+```
 
 
-### Interested in learning more?
+### Contact
 
-If you are interested in learning more about the components, please read the [cluster-state-service](cluster-state-service) and [daemon-scheduler](daemon-scheduler) README files.
+* [Gitter](https://gitter.im/blox)
+* [Planning/Roadmap](https://github.com/blox/blox/milestones)
+* [Issues](https://github.com/blox/blox/issues)
 
-### Deploying Blox
-
-We provide two methods for deploying *blox*:  
-* Local deployment
-* AWS deployment
-
-#### Local Deployment
-
-You can deploy locally and quickly try out Blox using our Docker Compose file. This allows you to get started with building custom schedulers using the cluster-state-service. The Docker Compose file launches the *blox* components, *cluster-state-service* and *daemon-scheduler*, along with a backing state store, etcd. Please see [Blox Deployment Guide](deploy) to launch *blox* using the Docker Compose file.
-
-#### AWS Deployment
-
-We also provide an AWS CloudFormation template to launch the *blox* stack easily on AWS. The AWS deployed *blox* stack makes use of AWS services designed to provide a secure public facing scheduler endpoint.
-
-##### Creating a Blox stack on AWS
-
-Deploying Blox using the AWS CloudFormation template in AWS sets up a stack consisting of the following components:
-* An Amazon SQS queue is created for you, and Amazon CloudWatch is configured to deliver ECS events to your queue.
-* *blox* components are set up as a service running on an Amazon ECS cluster. The *cluster-state-service*, *daemon-scheduler* , and etcd containers run as a single task on a container instance. The scheduler endpoint is made reachable, which allows you to securely interact with the endpoint.
-* An Application Load Balancer (ALB) is created in front of your scheduler endpoint.
-* An Amazon API Gateway endpoint is set up as the public facing frontend and provides an authentication mechanism for the *blox* stack. The API Gateway endpoint can be used to reach the scheduler and manage tasks on the ECS cluster.
-* An AWS Lambda function acts as a simple proxy which enables the public facing API Gateway endpoint to forward requests onto the ALB listener in the VPC.
-
-For more information about deployment instructions, see [Blox Deployment Guide](deploy).
-
-### Building Blox
-
-For more information about how to build these components, see [cluster-state-service](cluster-state-service) and [daemon-scheduler](daemon-scheduler).
-
-### Contributing to Blox
-
-All projects under Blox are released under Apache 2.0 and the usual Apache Contributor Agreements apply for individual contributors. All projects are maintained in public on GitHub, issues and pull requests use GitHub, and discussions use our Gitter channel. We look forward to collaborating with the community.
+### License
+All projects under Blox are released under Apache 2.0 and contributions are accepted under individual Apache Contributor Agreements.

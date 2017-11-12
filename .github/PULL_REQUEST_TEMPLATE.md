@@ -1,4 +1,4 @@
-
+TODO
 #### Summary
 <!-- What does this pull request do? -->
 
@@ -7,8 +7,6 @@
 
 #### Testing
 <!-- How was this tested? -->
-- [ ] Binary built locally and unit-tests pass (`make`)  
-- [ ] Build in docker succeeds (`make release`)
 
 New tests cover the changes: <!-- yes|no -->
 
@@ -21,3 +19,6 @@ for inclusion in changelog.
 #### Licensing
 
 This contribution is under the terms of the Apache 2.0 License: Yes
+
+#### Before merging
+<!-- Run integration and end-to-end tests before merging -->

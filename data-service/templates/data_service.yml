@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Resources:
+
+  EnvironmentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+     #TODO: change ddb table names to have region prefix passed in as a resource
+     TableName: Environments
+     AttributeDefinitions:
+       - AttributeName: environmentId
+         AttributeType: S
+       - AttributeName: environmentVersion
+         AttributeType: S
+     KeySchema:
+       - AttributeName: "environmentId"
+         KeyType: HASH
+       - AttributeName: "environmentVersion"
+         KeyType: RANGE
+     ProvisionedThroughput:
+       ReadCapacityUnits: 15
+       WriteCapacityUnits: 15
+
+  EnvironmentTargetVersionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+     #TODO: change ddb table names to have region prefix passed in as a resource
+      TableName: EnvironmentTargetVersion
+      AttributeDefinitions:
+        - AttributeName: environmentId
+          AttributeType: S
+        - AttributeName: cluster
+          AttributeType: S
+      KeySchema:
+        - AttributeName: "environmentId"
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 15
+        WriteCapacityUnits: 15
+      GlobalSecondaryIndexes:
+        -
+          IndexName: "environment-cluster-index"
+          KeySchema:
+            -
+              AttributeName: "cluster"
+              KeyType: "HASH"
+          Projection:
+            ProjectionType: "KEYS_ONLY"
+          ProvisionedThroughput:
+            ReadCapacityUnits: 15
+            WriteCapacityUnits: 15
+
+  DataServiceHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: java8
+      CodeUri: ../build/distributions/data-service.zip
+      Handler: com.amazonaws.blox.dataservice.LambdaHandler
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+      - AmazonDynamoDBFullAccess # TODO: scope down permissions
+
+Outputs:
+  DataService:
+    Description: Name of Data service handler function
+    Value: !Ref DataServiceHandler
+    Export:
+      Name: DataServiceHandler

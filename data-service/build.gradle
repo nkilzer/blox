@@ -1,0 +1,114 @@
+plugins {
+    id "java"
+    id 'net.ltgt.apt'
+}
+
+description "Implementation of the Blox DataService"
+
+compileJava {
+    options.compilerArgs = [
+            '-Amapstruct.defaultComponentModel=spring'
+    ]
+}
+
+sourceSets {
+    integTest {
+        java.srcDir file('src/integTest/java')
+        resources.srcDir file('src/integTest/resources')
+        runtimeClasspath += main.output + test.output
+    }
+}
+
+task integTests(type: Test, dependsOn: build) {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = 'Runs the integration tests.'
+
+    maxHeapSize = '1024m'
+
+    testClassesDirs = sourceSets.integTest.output.classesDirs
+}
+
+test {
+    exclude '**/*IntegTest'
+}
+
+dependencies {
+    compile project(":data-service-model")
+    compile project(":lambda-spring")
+    compile project(":json-rpc-lambda-server")
+
+    compile(
+            'com.amazonaws:aws-java-sdk-dynamodb',
+            'com.amazonaws:aws-lambda-java-log4j2:1.0.+',
+
+            'org.apache.logging.log4j:log4j-slf4j-impl:2.8.+',
+            'org.apache.commons:commons-lang3:3.6',
+
+            'org.projectlombok:lombok',
+
+            'org.mapstruct:mapstruct-jdk8',
+
+            'org.springframework:spring-core',
+            'org.springframework:spring-beans',
+            'org.springframework:spring-context',
+
+            'org.slf4j:slf4j-api'
+    )
+
+    testCompile(
+            'junit:junit:4.12',
+            'org.hamcrest:hamcrest-junit:2.+',
+            'org.mockito:mockito-core',
+            'org.slf4j:slf4j-api',
+            'org.slf4j:jcl-over-slf4j',
+            'org.springframework:spring-test'
+    )
+
+    integTestCompile(
+            sourceSets.main.output,
+            sourceSets.test.output,
+            configurations.compile,
+            configurations.testCompile
+    )
+
+    integTestRuntime(
+            configurations.runtime,
+            configurations.testRuntime
+    )
+
+    apt 'org.mapstruct:mapstruct-processor'
+    apt 'org.projectlombok:lombok'
+}
+
+
+task packageLambda(type: Zip, dependsOn: classes) {
+    group "build"
+    description "Create a Lambda deployment package with this package's code and all required libraries"
+
+    from compileJava
+    from processResources
+
+    into('lib') {
+        from configurations.runtime
+    }
+}
+
+task deploy {
+    inputs.file packageLambda
+
+    doLast {
+        exec {
+            commandLine aws("cloudformation", "package",
+                    "--template-file", "templates/data_service.yml",
+                    "--output-template-file", "templates/data_service.output.yml",
+                    "--s3-bucket", stack.s3Bucket)
+        }
+
+        exec {
+            commandLine aws("cloudformation", "deploy",
+                    "--template-file", "templates/data_service.output.yml",
+                    "--stack-name", "data-service",
+                    "--capabilities", "CAPABILITY_IAM")
+        }
+    }
+}

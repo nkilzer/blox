@@ -1,0 +1,77 @@
+plugins {
+    id "java"
+    id "io.spring.dependency-management"
+}
+
+
+description "Scheduling lifecycle and deployment logic"
+
+dependencies {
+    compile(
+            project(":lambda-spring"),
+            'com.amazonaws:aws-lambda-java-core:1.1.0',
+            'com.amazonaws:aws-lambda-java-events:1.3.0',
+            'com.amazonaws:aws-lambda-java-log4j2:1.0.0',
+
+            'software.amazon.awssdk:ecs',
+            'software.amazon.awssdk:lambda',
+
+            'org.apache.commons:commons-lang3:3.6+',
+
+            'org.projectlombok:lombok',
+
+            'org.apache.logging.log4j:log4j-slf4j-impl:2.8.+',
+            'org.slf4j:slf4j-api:1.7.+',
+
+            'org.springframework:spring-core',
+            'org.springframework:spring-beans',
+            'org.springframework:spring-context',
+
+            'com.spotify:completable-futures:+',
+            project(":data-service-model"),
+            project(":json-rpc-lambda-client"),
+    )
+
+    testCompile(
+            'software.amazon.awssdk:cloudformation',
+
+            'org.springframework:spring-test',
+            'org.mockito:mockito-core',
+            'org.hamcrest:hamcrest-junit:2.+',
+            'junit:junit:4.12'
+    )
+}
+
+test {
+    useJUnit {
+        excludeCategories 'com.amazonaws.blox.testcategories.IntegrationTest'
+    }
+}
+
+task packageLambda(type: Zip) {
+    from compileJava
+    from processResources
+    into('lib') {
+        from configurations.runtime
+    }
+}
+
+task deploy {
+    inputs.file packageLambda
+
+    doLast {
+        exec {
+            commandLine aws("cloudformation", "package",
+                    "--template-file", "templates/scheduling_manager.yml",
+                    "--output-template-file", "templates/scheduling_manager.output.yml",
+                    "--s3-bucket", stack.s3Bucket)
+        }
+
+        exec {
+            commandLine aws("cloudformation", "deploy",
+                    "--template-file", "templates/scheduling_manager.output.yml",
+                    "--stack-name", "scheduling-manager",
+                    "--capabilities", "CAPABILITY_IAM")
+        }
+    }
+}

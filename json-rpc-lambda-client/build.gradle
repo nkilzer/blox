@@ -1,0 +1,13 @@
+plugins {
+    id "java"
+}
+
+description 'Blox DataService Client'
+
+dependencies {
+    compile "com.github.briandilley.jsonrpc4j:jsonrpc4j:+"
+
+    compile "software.amazon.awssdk:lambda"
+
+    compileOnly "org.projectlombok:lombok"
+}
